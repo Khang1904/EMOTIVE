@@ -29,63 +29,60 @@ def show_chat_page():
     if st.session_state.analysis_stage == "cnn":
         st.subheader("📷 Image Input")
         
-        camera_photo = st.camera_input("Take a photo with your camera")
-        
-        if camera_photo is not None:
-            st.image(camera_photo, caption="Camera Photo", use_container_width=True)
-            st.success("Photo captured successfully!")
-            st.session_state.captured_photo = camera_photo
+        # Only show camera input if no photo has been captured yet
+        if st.session_state.captured_photo is None:
+            camera_photo = st.camera_input("Take a photo with your camera")
             
-            if st.button("Analyze Emotion", key="analyze_camera"):
-                st.session_state.analysis_stage = "cnn_processing"
+            if camera_photo is not None:
+                st.session_state.captured_photo = camera_photo
                 st.rerun()
-    
-    # CNN Processing Stage
-    if st.session_state.analysis_stage == "cnn_processing":
-        st.subheader("🔍 CNN Analysis (Facial Recognition)")
-        st.write("Analyzing facial expressions and emotions...")
-        
-        # Load model and make predictions
-        if st.session_state.captured_photo is not None:
-            try:
-                # Load the CNN model
-                model_path = "models/CNN_ep50.h5"
-                model = load_model(model_path)
-                
-                # Process the image
-                img = Image.open(st.session_state.captured_photo)
-                # Convert to grayscale
-                img = img.convert('L')
-                img_array = np.array(img.resize((48, 48))) / 255.0
-                
-                # Add batch and channel dimensions
-                img_array = np.expand_dims(img_array, axis=0)
-                img_array = np.expand_dims(img_array, axis=-1)
-                
-                # Make prediction
-                predictions = model.predict(img_array, verbose=0)
-                
-                # Emotion classes based on FER2013 dataset
-                emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
-                
-                # Get top 3 predictions
-                top_3_indices = np.argsort(predictions[0])[-3:][::-1]
-                
-                st.session_state.predictions = predictions[0]
-                
-                # Display results
-                st.write("**Top 3 Emotion Predictions:**")
-                for rank, idx in enumerate(top_3_indices, 1):
-                    emotion = emotion_labels[idx]
-                    confidence = predictions[0][idx] * 100
-                    st.write(f"{rank}. **{emotion}**: {confidence:.2f}%")
-                
-            except Exception as e:
-                st.error(f"Error loading model: {e}")
-        
-        if st.button("Complete CNN Analysis"):
-            st.session_state.analysis_stage = "nlp"
-            st.rerun()
+        else:
+            # Show captured photo
+            st.image(st.session_state.captured_photo, caption="Camera Photo", use_container_width=True)
+            st.success("Photo captured successfully!")
+            
+            if st.button("Retry", key="retake_photo"):
+                st.session_state.captured_photo = None
+                st.rerun()
+            
+            if st.button("Next", key="analyze_camera"):
+                try:
+                    # Load the CNN model
+                    model_path = "models/CNN_ep50.h5"
+                    model = load_model(model_path)
+                    
+                    # Process the image
+                    img = Image.open(st.session_state.captured_photo)
+                    # Convert to grayscale
+                    img = img.convert('L')
+                    img_array = np.array(img.resize((48, 48))) / 255.0
+                    
+                    # Add batch and channel dimensions
+                    img_array = np.expand_dims(img_array, axis=0)
+                    img_array = np.expand_dims(img_array, axis=-1)
+                    
+                    # Make prediction
+                    predictions = model.predict(img_array, verbose=0)
+                    
+                    # Emotion classes based on FER2013 dataset
+                    emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+                    
+                    # Get top 3 predictions
+                    top_3_indices = np.argsort(predictions[0])[-3:][::-1]
+                    
+                    st.session_state.predictions = predictions[0]
+                    
+                    # Save results in a variable
+                    cnn_results = []
+                    for rank, idx in enumerate(top_3_indices, 1):
+                        emotion = emotion_labels[idx]
+                        confidence = predictions[0][idx] * 100
+                        cnn_results.append({"rank": rank, "emotion": emotion, "confidence": confidence})
+                    
+                    st.session_state.analysis_stage = "nlp"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error loading model: {e}")
     
     # NLP Stage (appears after CNN)
     elif st.session_state.analysis_stage == "nlp":
@@ -98,7 +95,13 @@ def show_chat_page():
             max_chars=100
         )
         
-        if st.button("Share Your Feeling"):
+        if st.button("Previous", key="start_over"):
+            st.session_state.analysis_stage = "cnn"
+            st.session_state.captured_photo = None
+            st.session_state.predictions = None
+            st.rerun()
+        
+        if st.button("Submit", key="share_feeling"):
             if emotion_text.strip():
                 try:
                     # Load the NLP model
@@ -129,20 +132,15 @@ def show_chat_page():
                     # Get top 3 predictions
                     top_3_indices = np.argsort(nlp_predictions[0])[-3:][::-1]
                     
-                    st.write("**Top 3 Emotion Predictions:**")
+                    # Save results in a variable
+                    nlp_results = []
                     for rank, idx in enumerate(top_3_indices, 1):
                         emotion = emotion_labels[idx]
                         confidence = nlp_predictions[0][idx] * 100
-                        st.write(f"{rank}. **{emotion}**: {confidence:.2f}%")
+                        nlp_results.append({"rank": rank, "emotion": emotion, "confidence": confidence})
                     
                 except Exception as e:
                     st.error(f"Error analyzing text: {e}")
             else:
                 st.warning("Please describe how you're feeling!")
-        
-        if st.button("Start Over"):
-            st.session_state.analysis_stage = "cnn"
-            st.session_state.captured_photo = None
-            st.session_state.predictions = None
-            st.rerun()
 
