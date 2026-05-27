@@ -27,6 +27,9 @@ if st.sidebar.button("ℹ️ About", use_container_width=True):
     st.session_state.current_page = "About"
 if st.sidebar.button("💬 Chat", use_container_width=True):
     st.session_state.current_page = "Chat"
+if st.sidebar.button("⚙️ Config", use_container_width=True):
+    st.session_state.current_page = "Config"
+
 # Page routing
 if st.session_state.current_page == "Home":
     st.title("EMOTIVE: The Emotion Visual Detector")

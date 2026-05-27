@@ -24,6 +24,14 @@ def show_chat_page():
         st.session_state.captured_photo = None
     if "predictions" not in st.session_state:
         st.session_state.predictions = None
+    if "cnn_results" not in st.session_state:
+        st.session_state.cnn_results = None
+    if "nlp_results" not in st.session_state:
+        st.session_state.nlp_results = None
+    if "emotion_text" not in st.session_state:
+        st.session_state.emotion_text = None
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
     
     # Image Input Stage (CNN)
     if st.session_state.analysis_stage == "cnn":
@@ -79,6 +87,7 @@ def show_chat_page():
                         confidence = predictions[0][idx] * 100
                         cnn_results.append({"rank": rank, "emotion": emotion, "confidence": confidence})
                     
+                    st.session_state.cnn_results = cnn_results
                     st.session_state.analysis_stage = "nlp"
                     st.rerun()
                 except Exception as e:
@@ -113,8 +122,14 @@ def show_chat_page():
                     vocab_size = 10000
                     max_length = 150
                     
+                    # Use LabelEncoder to match nlp.ipynb
+                    from sklearn.preprocessing import LabelEncoder
+                    le = LabelEncoder()
+                    le.fit(nlp_csv['emotion'])
+                    emotion_labels = le.classes_
+                    
                     tokenizer = Tokenizer(num_words=vocab_size, oov_token="OOV")
-                    tokenizer.fit_on_texts(nlp_csv['statement'].astype(str).values)
+                    tokenizer.fit_on_texts(nlp_csv['text'].astype(str).values)
                     
                     # Tokenize and pad the input text (matching nlp.ipynb preprocessing)
                     text_sequences = tokenizer.texts_to_sequences([emotion_text.lower()])
@@ -126,9 +141,6 @@ def show_chat_page():
                     # Make prediction
                     nlp_predictions = nlp_model.predict(text_flattened, verbose=0)
                     
-                    # Emotion labels (matching emotion_map from nlp.ipynb: 6 classes)
-                    emotion_labels = ['Surprise', 'Joy', 'Sadness', 'Anger', 'Fear', 'Love']
-                    
                     # Get top 3 predictions
                     top_3_indices = np.argsort(nlp_predictions[0])[-3:][::-1]
                     
@@ -139,8 +151,97 @@ def show_chat_page():
                         confidence = nlp_predictions[0][idx] * 100
                         nlp_results.append({"rank": rank, "emotion": emotion, "confidence": confidence})
                     
+                    st.session_state.nlp_results = nlp_results
+                    st.session_state.emotion_text = emotion_text
+                    st.session_state.analysis_stage = "chat"
+                    st.rerun()
+                    
                 except Exception as e:
                     st.error(f"Error analyzing text: {e}")
             else:
                 st.warning("Please describe how you're feeling!")
+    
+    # Chat Stage with Google Generative AI
+    elif st.session_state.analysis_stage == "chat":
+        st.subheader("🤖 Chat with EMOTIVE AI")
+        
+        # Display analysis results
+        # col1, col2 = st.columns(2)
+        # 
+        # with col1:
+        #     st.markdown("**Visual Emotion (from photo):**")
+        #     if st.session_state.cnn_results:
+        #         for result in st.session_state.cnn_results[:1]:
+        #             st.info(f"😊 {result['emotion']} ({result['confidence']:.1f}%)")
+        # 
+        # with col2:
+        #     st.markdown("**Text Emotion (from description):**")
+        #     if st.session_state.nlp_results:
+        #         for result in st.session_state.nlp_results[:1]:
+        #             st.info(f"💭 {result['emotion']} ({result['confidence']:.1f}%)")
+        
+        # Initialize Google Generative AI
+        try:
+            api_key_name = st.session_state.get("selected_api_key", "TEST_KEY_1")
+            api_key = st.secrets[api_key_name]
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-2.0-flash")
+        except Exception as e:
+            st.error(f"Failed to initialize API: {e}")
+            st.stop()
+        
+        # System prompt for the AI
+        system_prompt = f"""You are EMOTIVE, an empathetic AI emotion coach. The user has just shared:
+- What they're feeling visually (from their photo): {st.session_state.cnn_results[0]['emotion'] if st.session_state.cnn_results else 'Unknown'}
+- What they expressed in text: "{st.session_state.emotion_text}"
+
+Be supportive, empathetic, and helpful. Provide insights about their emotions and offer constructive advice or just listen empathetically."""
+        
+        # Display chat history
+        for message in st.session_state.chat_history:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+        
+        # Chat input
+        user_input = st.chat_input("Ask EMOTIVE something or share more...")
+        
+        if user_input:
+            # Add user message to chat history
+            st.session_state.chat_history.append({"role": "user", "content": user_input})
+            
+            with st.chat_message("user"):
+                st.markdown(user_input)
+            
+            # Get AI response
+            try:
+                full_prompt = system_prompt + f"\n\nUser: {user_input}"
+                response = model.generate_content(full_prompt)
+                ai_response = response.text
+                
+                # Add AI response to chat history
+                st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+                
+                with st.chat_message("assistant"):
+                    st.markdown(ai_response)
+            except Exception as e:
+                st.error(f"Error generating response: {e}")
+        
+        st.divider()
+        
+        # Navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Back", key="back_to_nlp"):
+                st.session_state.analysis_stage = "nlp"
+                st.rerun()
+        with col2:
+            if st.button("Start Over", key="start_fresh"):
+                st.session_state.analysis_stage = "cnn"
+                st.session_state.captured_photo = None
+                st.session_state.predictions = None
+                st.session_state.cnn_results = None
+                st.session_state.nlp_results = None
+                st.session_state.emotion_text = None
+                st.session_state.chat_history = []
+                st.rerun()
 
