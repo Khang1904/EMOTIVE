@@ -182,20 +182,53 @@ def show_chat_page():
         
         # Initialize Google Generative AI
         try:
-            api_key_name = st.session_state.get("selected_api_key", "TEST_KEY_1")
-            api_key = st.secrets[api_key_name]
+            # Check if using custom API key
+            if st.session_state.get("selected_api_key") is None:
+                # Use custom API key from session state
+                api_key = st.session_state.get("custom_api_key", "")
+                if not api_key:
+                    st.error("No API key configured. Please set a key in the Config page.")
+                    st.stop()
+            else:
+                # Use predefined key from secrets
+                api_key_name = st.session_state.get("selected_api_key", "TEST_KEY_1")
+                api_key = st.secrets[api_key_name]
+            
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash")
         except Exception as e:
             st.error(f"Failed to initialize API: {e}")
             st.stop()
         
-        # System prompt for the AI
-        system_prompt = f"""You are EMOTIVE, an empathetic AI emotion coach. The user has just shared:
-- What they're feeling visually (from their photo): {st.session_state.cnn_results[0]['emotion'] if st.session_state.cnn_results else 'Unknown'}
-- What they expressed in text: "{st.session_state.emotion_text}"
+        # System prompt for the AI with scope constraints
+        system_prompt = f"""You are EMOTIVE, an empathetic AI emotion coach. Your ONLY purpose is to support users with their emotions and mental wellbeing.
 
-Be supportive, empathetic, and helpful. Provide insights about their emotions and offer constructive advice or just listen empathetically."""
+**User Context:**
+- Visual emotion (from their photo): {st.session_state.cnn_results[0]['emotion'] if st.session_state.cnn_results else 'Unknown'}
+- What they shared: "{st.session_state.emotion_text}"
+
+**Your Role Guidelines:**
+1. ONLY engage with topics related to emotions, feelings, mental health, and emotional wellbeing
+2. If the user asks something outside your scope (e.g., coding, math, politics, recipes, etc.), POLITELY DECLINE and redirect them back to emotion support
+3. Be warm and empathetic even when declining off-topic questions
+4. Use phrases like: "I'm specifically designed to help with emotions. Can we talk about how you're feeling?" or "That's outside my wheelhouse - I'm here to support your emotional wellbeing. What emotions would you like to explore?"
+
+**Allowed Topics:**
+- Emotions, feelings, and emotional states
+- Coping strategies and emotional resilience
+- Mental health and wellbeing
+- Relationships and social emotions
+- Stress, anxiety, sadness, anger, joy, etc.
+- Self-care and emotional growth
+
+**Not Allowed:**
+- Technical questions, coding, math
+- General knowledge, facts, trivia
+- Legal, medical, financial advice
+- Instructions for harmful activities
+- Any topic unrelated to emotions and wellbeing
+
+Always maintain empathy, but firmly keep conversations focused on emotion support."""
         
         # Display chat history
         for message in st.session_state.chat_history:
