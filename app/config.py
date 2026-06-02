@@ -20,39 +20,60 @@ def show_config_page():
     # API Key Selection
     st.subheader("🔑 API Configuration")
     
-    tab1, tab2 = st.tabs(["Predefined Keys", "Custom Key"])
+    # Display current selection status
+    st.markdown("### Current Key Selection")
+    if st.session_state.selected_api_key:
+        st.info(f"✅ Using predefined key: **{st.session_state.selected_api_key}**")
+    elif st.session_state.custom_api_key:
+        st.info(f"✅ Using custom API key (first 10 chars): **{st.session_state.custom_api_key[:10]}***")
+    else:
+        st.warning("⚠️ No API key selected. Please select or enter a key below.")
     
-    with tab1:
-        st.markdown("Select from available predefined API keys:")
+    st.divider()
+    
+    # Predefined Keys Section
+    st.markdown("### 📦 Predefined Keys")
+    col1, col2 = st.columns([3, 1])
+    with col1:
         available_keys = ["OFFICIAL_KEY", "TEST_KEY_1", "TEST_KEY_2", "TEST_KEY_3"]
-        
         selected_key = st.selectbox(
-            "Select the API key to use for the model:",
+            "Select a predefined API key:",
             options=available_keys,
-            index=available_keys.index(st.session_state.selected_api_key),
-            help="Choose which API key configuration to use for Gemini API calls",
+            help="Choose which predefined API key configuration to use",
             key="predefined_key_select"
         )
-        
-        if selected_key != st.session_state.selected_api_key:
+    
+    with col2:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+        if st.button("✓ Select", key="select_predefined"):
             st.session_state.selected_api_key = selected_key
             st.session_state.custom_api_key = ""
-            st.success(f"API key changed to: {selected_key}")
+            st.success(f"✅ Switched to: {selected_key}")
+            st.rerun()
     
-    with tab2:
-        st.markdown("Enter your own Gemini API key:")
+    st.divider()
+    
+    # Custom Key Section
+    st.markdown("### 🔐 Custom Key")
+    col1, col2 = st.columns([3, 1])
+    with col1:
         custom_key = st.text_input(
-            "Your API Key:",
+            "Enter your own Gemini API key:",
             type="password",
             value=st.session_state.custom_api_key,
             help="Paste your Gemini API key here. It will be kept secure.",
             key="custom_api_input"
         )
-        
-        if custom_key != st.session_state.custom_api_key:
-            st.session_state.custom_api_key = custom_key
-            if custom_key:
+    
+    with col2:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+        if st.button("✓ Select", key="select_custom"):
+            if custom_key.strip():
+                st.session_state.custom_api_key = custom_key
                 st.session_state.selected_api_key = None
-                st.success("Custom API key has been set!")
+                st.success("✅ Custom API key selected!")
+                st.rerun()
             else:
-                st.session_state.selected_api_key = "OFFICIAL_KEY"
+                st.error("Please enter a valid API key.")
