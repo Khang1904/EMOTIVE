@@ -203,15 +203,27 @@ def show_chat_page():
         # System prompt for the AI with scope constraints
         system_prompt = f"""You are EMOTIVE, an empathetic AI emotion coach. Your ONLY purpose is to support users with their emotions and mental wellbeing.
 
-**User Context:**
-- Visual emotion (from their photo): {st.session_state.cnn_results[0]['emotion'] if st.session_state.cnn_results else 'Unknown'}
-- What they shared: "{st.session_state.emotion_text}"
+**User's Current Situation:**
+
+📷 **From their photo:**
+- Detected emotion: {st.session_state.cnn_results[0]['emotion'] if st.session_state.cnn_results else 'Unknown'}
+- Confidence: {st.session_state.cnn_results[0]['confidence']:.1f}% if st.session_state.cnn_results else 'N/A'
+- Top 3 emotions detected: {', '.join([f"{r['emotion']} ({r['confidence']:.0f}%)" for r in st.session_state.cnn_results[:3]]) if st.session_state.cnn_results else 'N/A'}
+
+💭 **What they told us:**
+"{st.session_state.emotion_text}"
+
+📊 **Text emotion analysis:**
+- Detected emotion: {st.session_state.nlp_results[0]['emotion'] if st.session_state.nlp_results else 'Unknown'}
+- Confidence: {st.session_state.nlp_results[0]['confidence']:.1f}% if st.session_state.nlp_results else 'N/A'
+- Top emotions: {', '.join([f"{r['emotion']} ({r['confidence']:.0f}%)" for r in st.session_state.nlp_results[:3]]) if st.session_state.nlp_results else 'N/A'}
 
 **Your Role Guidelines:**
 1. ONLY engage with topics related to emotions, feelings, mental health, and emotional wellbeing
-2. If the user asks something outside your scope (e.g., coding, math, politics, recipes, etc.), POLITELY DECLINE and redirect them back to emotion support
-3. Be warm and empathetic even when declining off-topic questions
-4. Use phrases like: "I'm specifically designed to help with emotions. Can we talk about how you're feeling?" or "That's outside my wheelhouse - I'm here to support your emotional wellbeing. What emotions would you like to explore?"
+2. Use the image and text context provided above to better understand their emotional state
+3. Reference what you see in the image and what they shared in your responses to show you understand
+4. If the user asks something outside your scope (e.g., coding, math, politics, recipes, etc.), POLITELY DECLINE and redirect them back to emotion support
+5. Be warm, empathetic, and personalized in your responses
 
 **Allowed Topics:**
 - Emotions, feelings, and emotional states
@@ -247,8 +259,50 @@ Always maintain empathy, but firmly keep conversations focused on emotion suppor
             
             # Get AI response
             try:
-                full_prompt = system_prompt + f"\n\nUser: {user_input}"
-                response = model.generate_content(full_prompt)
+                # Prepare image for multimodal input
+                user_image = None
+                if st.session_state.captured_photo:
+                    # Open and process the image
+                    user_image = Image.open(st.session_state.captured_photo)
+                    st.session_state.captured_photo.seek(0)  # Reset file pointer
+                
+                # Build rich context message
+                context_message = f"""
+CONTEXT ABOUT THIS USER:
+
+📷 Photo Analysis:
+- Main emotion detected: {st.session_state.cnn_results[0]['emotion'] if st.session_state.cnn_results else 'Unknown'}
+- Other emotions: {', '.join([f"{r['emotion']} ({r['confidence']:.0f}%)" for r in st.session_state.cnn_results[1:3]]) if st.session_state.cnn_results else 'N/A'}
+
+💭 Text Sentiment:
+- User said: "{st.session_state.emotion_text}"
+- Detected emotion: {st.session_state.nlp_results[0]['emotion'] if st.session_state.nlp_results else 'Unknown'}
+- Other emotions: {', '.join([f"{r['emotion']} ({r['confidence']:.0f}%)" for r in st.session_state.nlp_results[1:3]]) if st.session_state.nlp_results else 'N/A'}
+
+---
+
+User's current message: {user_input}
+"""
+                
+                # Create content list with image and text
+                if user_image:
+                    content = [
+                        "Analyze this photo and help support the user based on their emotion:",
+                        user_image,
+                        context_message,
+                    ]
+                else:
+                    content = context_message
+                
+                # Generate response using the model with image and context
+                response = model.generate_content(
+                    content,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        top_p=0.95,
+                    )
+                )
+                
                 ai_response = response.text
                 
                 # Add AI response to chat history
