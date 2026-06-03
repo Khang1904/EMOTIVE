@@ -4,28 +4,28 @@ import google.generativeai as genai
 import streamlit as st
 import json
 
-# Automatically initialize default API key when config is loaded
 def _initialize_default_api_key():
-    """Initialize default API key in session state when config module is loaded"""
-    # Only initialize if not already set
+    """Initialize default API key in session state."""
     if "selected_api_key" not in st.session_state:
         st.session_state.selected_api_key = "OFFICIAL_KEY"
-        
-        # Set the actual API key if OFFICIAL_KEY exists in secrets
-        try:
-            if "OFFICIAL_KEY" in st.secrets:
-                genai.configure(api_key=st.secrets["OFFICIAL_KEY"])
-        except Exception as e:
-            print(f"Note: Could not auto-configure API key: {e}")
-    
     if "custom_api_key" not in st.session_state:
         st.session_state.custom_api_key = ""
+    try:
+        if st.session_state.selected_api_key == "OFFICIAL_KEY" and "OFFICIAL_KEY" in st.secrets:
+            genai.configure(api_key=st.secrets["OFFICIAL_KEY"])
+    except Exception as e:
+        print(f"Note: Could not auto-configure API key: {e}")
 
-# Run initialization when module is imported
+# Helper to ensure session state is present when rendering pages
+def ensure_api_state():
+    _initialize_default_api_key()
+
+# Ensure default session keys exist at import time too
 _initialize_default_api_key()
 
 def show_config_page():
     """Display the configuration page"""
+    ensure_api_state()
     st.title("⚙️ Configuration")
     st.markdown("""
     Configure your EMOTIVE settings and preferences here.
@@ -37,9 +37,9 @@ def show_config_page():
     
     # Display current selection status
     st.markdown("### Current Key Selection")
-    if st.session_state.selected_api_key:
+    if st.session_state.get("selected_api_key"):
         st.info(f"✅ Using predefined key: **{st.session_state.selected_api_key}**")
-    elif st.session_state.custom_api_key:
+    elif st.session_state.get("custom_api_key"):
         st.info(f"✅ Using custom API key (first 10 chars): **{st.session_state.custom_api_key[:10]}***")
     else:
         st.warning("⚠️ No API key selected. Please select or enter a key below.")
