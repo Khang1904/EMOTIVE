@@ -4,6 +4,26 @@ import google.generativeai as genai
 import streamlit as st
 import json
 
+# Automatically initialize default API key when config is loaded
+def _initialize_default_api_key():
+    """Initialize default API key in session state when config module is loaded"""
+    # Only initialize if not already set
+    if "selected_api_key" not in st.session_state:
+        st.session_state.selected_api_key = "OFFICIAL_KEY"
+        
+        # Set the actual API key if OFFICIAL_KEY exists in secrets
+        try:
+            if "OFFICIAL_KEY" in st.secrets:
+                genai.configure(api_key=st.secrets["OFFICIAL_KEY"])
+        except Exception as e:
+            print(f"Note: Could not auto-configure API key: {e}")
+    
+    if "custom_api_key" not in st.session_state:
+        st.session_state.custom_api_key = ""
+
+# Run initialization when module is imported
+_initialize_default_api_key()
+
 def show_config_page():
     """Display the configuration page"""
     st.title("⚙️ Configuration")
@@ -11,11 +31,6 @@ def show_config_page():
     Configure your EMOTIVE settings and preferences here.
     """)
     
-    # Initialize session state for API key selection
-    if "selected_api_key" not in st.session_state:
-        st.session_state.selected_api_key = "OFFICIAL_KEY"
-    if "custom_api_key" not in st.session_state:
-        st.session_state.custom_api_key = ""
     
     # API Key Selection
     st.subheader("🔑 API Configuration")

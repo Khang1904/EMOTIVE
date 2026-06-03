@@ -233,11 +233,11 @@ def show_about_page():
         
         perf_cols = st.columns(2)
         with perf_cols[0]:
-            st.metric("Accuracy", "63.37%", "FER2013 Test Set")
-            st.metric("Precision", "63.76%", "Weighted Avg")
+            st.metric("Accuracy", "66.68%", "FER2013 Test Set")
+            st.metric("Precision", "66.95%", "Weighted Avg")
         with perf_cols[1]:
-            st.metric("Recall", "63.37%", "Weighted Avg")
-            st.metric("F1-Score", "62.41%", "Weighted Avg")
+            st.metric("Recall", "66.68%", "Weighted Avg")
+            st.metric("F1-Score", "66.40%", "Weighted Avg")
     
     with col2:
         st.markdown("### 📝 NLP Text Model")

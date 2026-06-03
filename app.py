@@ -44,6 +44,9 @@ if st.session_state.current_page == "Home":
         <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap" rel="stylesheet">
     """, unsafe_allow_html=True)
     
+    # Display video
+    st.video("assets/EMOTIVE.mp4")
+    
     st.markdown("""
     Welcome to EMOTIVE! This application detects and analyzes emotions from visual input and text.
     
